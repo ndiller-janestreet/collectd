@@ -2088,6 +2088,23 @@ static int ps_read (void)
 
 			ps_list_add (procs[i].ki_comm, have_cmdline ? cmdline : NULL, &pse);
 
+			if (!count_thread_state)
+			{
+				switch (procs[i].ki_stat)
+				{
+					case SSTOP:	stopped++;	break;
+					case SSLEEP:	sleeping++;	break;
+					case SRUN:	running++;	break;
+					case SIDL:	idle++;		break;
+					case SWAIT:	wait++;		break;
+					case SLOCK:	blocked++;	break;
+					case SZOMB:	zombies++;	break;
+				}
+			}
+		} /* if ((proc_ptr == NULL) || (proc_ptr->ki_pid != procs[i].ki_pid)) */
+
+		if (count_thread_state)
+		{
 			switch (procs[i].ki_stat)
 			{
 				case SSTOP:	stopped++;	break;
@@ -2098,7 +2115,7 @@ static int ps_read (void)
 				case SLOCK:	blocked++;	break;
 				case SZOMB:	zombies++;	break;
 			}
-		} /* if ((proc_ptr == NULL) || (proc_ptr->ki_pid != procs[i].ki_pid)) */
+		}
 	}
 
 	kvm_close(kd);
@@ -2225,6 +2242,23 @@ static int ps_read (void)
 
 			ps_list_add (procs[i].p_comm, have_cmdline ? cmdline : NULL, &pse);
 
+			if (!count_thread_state)
+			{
+				switch (procs[i].p_stat)
+				{
+					case SSTOP:	stopped++;	break;
+					case SSLEEP:	sleeping++;	break;
+					case SRUN:	running++;	break;
+					case SIDL:	idle++;		break;
+					case SONPROC:	onproc++;	break;
+					case SDEAD:	dead++;		break;
+					case SZOMB:	zombies++;	break;
+				}
+			}
+		} /* if ((proc_ptr == NULL) || (proc_ptr->p_pid != procs[i].p_pid)) */
+
+		if (count_thread_state)
+		{
 			switch (procs[i].p_stat)
 			{
 				case SSTOP:	stopped++;	break;
@@ -2235,7 +2269,7 @@ static int ps_read (void)
 				case SDEAD:	dead++;		break;
 				case SZOMB:	zombies++;	break;
 			}
-		} /* if ((proc_ptr == NULL) || (proc_ptr->p_pid != procs[i].p_pid)) */
+		}
 	}
 
 	kvm_close(kd);
