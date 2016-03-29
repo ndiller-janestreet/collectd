@@ -224,6 +224,7 @@ typedef struct procstat
 static procstat_t *list_head_g = NULL;
 
 static _Bool report_ctx_switch = 0;
+static _Bool count_thread_state = 0;
 
 #if HAVE_THREAD_INFO
 static mach_port_t port_host_self;
@@ -588,6 +589,10 @@ static int ps_config (oconfig_item_t *ci)
 		else if (strcasecmp (c->key, "CollectContextSwitch") == 0)
 		{
 			cf_util_get_boolean (c, &report_ctx_switch);
+		}
+		else if (strcasecmp (c->key, "CountThreadState") == 0)
+		{
+			cf_util_get_boolean (c, &count_thread_state);
 		}
 		else
 		{
@@ -1803,6 +1808,10 @@ static int ps_read (void)
 	DIR           *proc;
 	long           pid;
 
+	struct dirent *taskent;
+	DIR           *dh;
+	char           dirname[64];
+
 	char cmdline[CMDLINE_BUFFER_SIZE];
 
 	int        status;
@@ -1868,16 +1877,76 @@ static int ps_read (void)
 		pse.cswitch_vol = ps.cswitch_vol;
 		pse.cswitch_invol = ps.cswitch_invol;
 
-		switch (state)
+		if (!count_thread_state)
 		{
-			case 'R': running++;  break;
-			case 'S': sleeping++; break;
-			case 'D': blocked++;  break;
-			case 'Z': zombies++;  break;
-			case 'T': stopped++;  break;
-			case 'W': paging++;   break;
+			switch (state)
+			{
+				case 'R': running++;  break;
+				case 'S': sleeping++; break;
+				case 'D': blocked++;  break;
+				case 'Z': zombies++;  break;
+				case 'T': stopped++;  break;
+				case 'W': paging++;   break;
+			}
 		}
+		else
+		{
+			ssnprintf (dirname, sizeof (dirname), "/proc/%li/task", pid);
+			if ((dh = opendir (dirname)) == NULL)
+			{
+				DEBUG ("Failed to open directory `%s'", dirname);
+			}
+			else
+			{
+				while ((taskent = readdir (dh)) != NULL)
+				{
+					char           filename[64];
+					FILE          *fh;
+					char buffer[1024];
+					char *fields[3];
+					int numfields;
+					char *tpid;
 
+					if (!isdigit ((int) taskent->d_name[0]))
+						continue;
+
+					tpid = taskent->d_name;
+
+					ssnprintf (filename, sizeof (filename),
+						"/proc/%li/task/%s/stat", pid, tpid);
+					if ((fh = fopen (filename, "r")) == NULL)
+					{
+						DEBUG ("Failed to open file `%s'", filename);
+						continue;
+					}
+				
+					if (fgets (buffer, sizeof(buffer), fh) != NULL) {
+						numfields = strsplit (buffer, fields,
+							STATIC_ARRAY_SIZE (fields));
+						if (numfields > 2)
+						{
+							switch (fields[2][0])
+							{
+								case 'R': running++;  break;
+								case 'S': sleeping++; break;
+								case 'D': blocked++;  break;
+								case 'Z': zombies++;  break;
+								case 'T': stopped++;  break;
+								case 'W': paging++;   break;
+							}
+						}
+					}
+
+					if (fclose (fh))
+					{
+						char errbuf[1024];
+						WARNING ("processes: fclose: %s",
+							sstrerror (errno, errbuf, sizeof (errbuf)));
+					}
+				}
+				closedir (dh);
+			}
+		}
 		ps_list_add (ps.name,
 				ps_get_cmdline (pid, ps.name, cmdline, sizeof (cmdline)),
 				&pse);
