@@ -1903,26 +1903,28 @@ static int ps_read (void)
 					char  filename[64];
 					FILE *fh;
 					char  buffer[1024];
-					char *fields[3];
+					char *fields[2];
 					int   numfields;
 
 					if (taskent->d_name[0] == '.')
 						continue;
 
 					ssnprintf (filename, sizeof (filename),
-						"/proc/%li/task/%s/stat", pid, taskent->d_name);
+						"/proc/%li/task/%s/status", pid, taskent->d_name);
 					if ((fh = fopen (filename, "r")) == NULL)
 					{
 						DEBUG ("Failed to open file `%s'", filename);
 						continue;
 					}
 
-					if (fgets (buffer, sizeof(buffer), fh) != NULL) {
+					while (fgets (buffer, sizeof(buffer), fh) != NULL) {
+						if (strncmp (buffer, "State:", 6) != 0)
+							continue;
 						numfields = strsplit (buffer, fields,
 							STATIC_ARRAY_SIZE (fields));
-						if (numfields > 2)
+						if (numfields > 1)
 						{
-							switch (fields[2][0])
+							switch (fields[1][0])
 							{
 								case 'R': running++;  break;
 								case 'S': sleeping++; break;
@@ -1931,6 +1933,7 @@ static int ps_read (void)
 								case 'T': stopped++;  break;
 								case 'W': paging++;   break;
 							}
+							break;
 						}
 					}
 
