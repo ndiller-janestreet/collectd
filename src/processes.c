@@ -1900,26 +1900,23 @@ static int ps_read (void)
 			{
 				while ((taskent = readdir (dh)) != NULL)
 				{
-					char           filename[64];
-					FILE          *fh;
-					char buffer[1024];
+					char  filename[64];
+					FILE *fh;
+					char  buffer[1024];
 					char *fields[3];
-					int numfields;
-					char *tpid;
+					int   numfields;
 
-					if (!isdigit ((int) taskent->d_name[0]))
+					if (taskent->d_name[0] == '.')
 						continue;
 
-					tpid = taskent->d_name;
-
 					ssnprintf (filename, sizeof (filename),
-						"/proc/%li/task/%s/stat", pid, tpid);
+						"/proc/%li/task/%s/stat", pid, taskent->d_name);
 					if ((fh = fopen (filename, "r")) == NULL)
 					{
 						DEBUG ("Failed to open file `%s'", filename);
 						continue;
 					}
-				
+
 					if (fgets (buffer, sizeof(buffer), fh) != NULL) {
 						numfields = strsplit (buffer, fields,
 							STATIC_ARRAY_SIZE (fields));
